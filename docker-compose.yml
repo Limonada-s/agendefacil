@@ -1,0 +1,30 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:13 
+    container_name: agendefacil_db
+    restart: always 
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123
+      POSTGRES_DB: agendefacil
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    container_name: agendefacil_backend
+    build: ./backend
+    # O Docker vai carregar todas as variáveis do seu arquivo .env
+    env_file:
+      - ./backend/.env
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: db
+    depends_on:
+      - db
+volumes:
+  postgres_data:

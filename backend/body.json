@@ -1,0 +1,17 @@
+{
+  "companyName": "Empresa Inovadora LTDA",
+  "cnpj": "23456789000123",
+  "ownerName": "Maria Inova",
+  "ownerCpf": "98765432100",
+  "email": "empresa.inovadora@email.com",
+  "phone": "11988887777",
+  "password": "senhaSegura123",
+  "plan": "PLUS",
+  "rua": "Av. das Inovações",
+  "numero": "456",
+  "bairro": "Tecnologia",
+  "city": "São Paulo",
+  "state": "SP",
+  "zipCode": "01001000",
+  "categories": [1, 2]
+}

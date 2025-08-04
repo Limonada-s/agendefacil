@@ -1,0 +1,9 @@
+npx sequelize-cli db:migrate --name 20250612160612-create-categorias --config config/database.js
+npx sequelize-cli db:migrate --name 20250612164801-create-enderecos --config config/database.js
+npx sequelize-cli db:migrate --name 20250612164801-add-endereco-id-to-empresas --config config/database.js
+npx sequelize-cli db:migrate --name 20250612184528-add-plano-to-empresas --config config/database.js
+npx sequelize-cli db:migrate --name 20250612185214-add-timestamps-to-empresas --config config/database.js
+npx sequelize-cli db:migrate --name 20250613100000-create-empresa-categorias --config config/database.js
+npx sequelize-cli db:migrate --name 20250615180000-create-agendamentos --config config/database.js
+npx sequelize-cli db:migrate --name 20250615180100-create-historico-agendamentos --config config/database.js
+npx sequelize-cli db:migrate --name 20250618020834-create-servicos --config config/database.js
