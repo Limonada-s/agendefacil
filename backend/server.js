@@ -52,7 +52,19 @@ app.use((req, res, next) => {
 });
 
 // Middlewares
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+
+const allowedOrigins = ['http://localhost:5173', 'https://agendefacil.vercel.app'];
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
 app.use(cookieParser());
 app.use(express.json());
 app.use(fileupload({ useTempFiles: true, tempFileDir: path.join(__dirname, 'temp') }));
