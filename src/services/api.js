@@ -1,15 +1,15 @@
 import axios from 'axios';
 
+const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
 const api = axios.create({
-  baseURL: 'https://agendefacil-backend-849628377389.southamerica-east1.run.app/api',
-  
+  baseURL: baseURL,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json'
   } 
 });
 
-// O interceptor para adicionar o token já está correto e pode continuar.
 api.interceptors.request.use(
   config => {
     const token = localStorage.getItem('token');
@@ -22,3 +22,4 @@ api.interceptors.request.use(
 );
 
 export default api;
+
