@@ -82,7 +82,6 @@ app.use('/api/profissionais', professionalRoutes);
 app.use('/api/financials', financialsRoutes);
 app.use('/api', sessionTestRoute); 
 
-app.use(express.static(path.join(__dirname, 'dist')));
 
 app.get('/*any', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
