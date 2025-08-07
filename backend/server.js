@@ -82,10 +82,6 @@ app.use('/api/profissionais', professionalRoutes);
 app.use('/api/financials', financialsRoutes);
 app.use('/api', sessionTestRoute); 
 
-
-app.get('/*any', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-});
 app.use((err, req, res, next) => {
   logger.error('error_log', {
     requestId: res.locals.requestId,
