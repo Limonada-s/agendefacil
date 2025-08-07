@@ -106,7 +106,7 @@ const MyBookingsPage = () => {
   const confirmCancelBooking = async () => {
     if (!bookingToCancelId) return;
     try {
-      await api.put(`/agendamentos/cliente/${bookingToCancelId}`, { status: 'cancelado' });
+      await api.put(`/agendamentos/${bookingToCancelId}`, { status: 'cancelado_pelo_cliente' });
       toast({ title: "Agendamento Cancelado!" });
       reloadAppointments();
     } catch (error) {

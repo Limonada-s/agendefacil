@@ -147,99 +147,71 @@ export const registerCompany = async (req, res) => {
 
 // ===== FUNÇÃO REESCRITA E OTIMIZADA =====
 export const listarEmpresasProximas = async (req, res) => {
-  const { lat, lng, raio = 10 } = req.query;
+ const { lat, lng, raio = 10 } = req.query;
 
-  if (!lat || !lng) {
-    return res.status(400).json({ erro: 'Latitude e longitude são obrigatórias.' });
-  }
+ if (!lat || !lng) {
+  return res.status(400).json({ erro: 'Latitude e longitude são obrigatórias.' });
+ }
 
-  try {
-    // A fórmula de Haversine para calcular a distância em Km.
-    // Isso será injetado diretamente na consulta SQL.
-    const haversine = `(
-      6371 * acos(
-        cos(radians(${lat}))
-        * cos(radians(latitude))
-        * cos(radians(longitude) - radians(${lng}))
-        + sin(radians(${lat}))
-        * sin(radians(latitude))
-      )
-    )`;
+ try {
+  const haversine = `(6371 * acos(cos(radians(${lat})) * cos(radians(latitude)) * cos(radians(longitude) - radians(${lng})) + sin(radians(${lat})) * sin(radians(latitude))))`;
 
-    const empresas = await db.Empresa.findAll({
-      attributes: {
-        include: [
-          // Inclui um novo campo 'distancia' no resultado
-          [literal(haversine), 'distancia'],
-          [fn('COALESCE', fn('AVG', col('reviews.rating')), 0), 'averageRating'],
-          [fn('COUNT', fn('DISTINCT', col('reviews.id'))), 'totalReviews']
-        ]
-      },
-      where: {
-        // Filtra diretamente no banco de dados, trazendo apenas empresas dentro do raio
-        [Op.and]: [
-          literal(`${haversine} <= ${raio}`),
-          { status: 'active' },
-          { subscriptionStatus: { [Op.in]: ['active', 'trialing'] } },
-          { latitude: { [Op.ne]: null } },
-          { longitude: { [Op.ne]: null } }
-        ]
-      },
-      include: [
-        {
-          model: db.Review,
-          as: 'reviews',
-          attributes: [],
-          where: { status: 'approved' },
-          required: false
-        },
-        {
-          model: db.Servico,
-          as: 'servicos',
-          attributes: ['id', 'name'],
-          required: false
-        },
-        {
-          model: db.Endereco,
-          as: 'endereco',
-          attributes: ['rua', 'numero', 'bairro', 'city'],
-          required: true
-        }
-      ],
-      group: ['Empresa.id', 'endereco.id', 'servicos.id'], // Agrupa por empresa para evitar duplicação de empresa
-      order: literal('distancia ASC'), // Ordena pela distância, as mais próximas primeiro
-      subQuery: false // Necessário para que o group e include funcionem corretamente com o literal
+  const empresas = await db.Empresa.findAll({
+   attributes: {
+    include: [
+     [literal(haversine), 'distancia'],
+     [fn('COALESCE', fn('AVG', col('reviews.rating')), 0), 'averageRating'],
+     [fn('COUNT', fn('DISTINCT', col('reviews.id'))), 'totalReviews']
+    ]
+   },
+   where: {
+    [Op.and]: [
+     literal(`${haversine} <= ${raio}`),
+     { status: 'active' },
+     { subscriptionStatus: { [Op.in]: ['active', 'trialing'] } },
+     { latitude: { [Op.ne]: null } },
+     { longitude: { [Op.ne]: null } }
+    ]
+   },
+   include: [
+    { model: db.Review, as: 'reviews', attributes: [], where: { status: 'approved' }, required: false },
+    { model: db.Servico, as: 'servicos', attributes: ['id', 'name'], required: false },
+    { model: db.Endereco, as: 'endereco', attributes: ['rua', 'numero', 'bairro', 'city'], required: true }
+   ],
+   group: ['Empresa.id', 'endereco.id', 'servicos.id'],
+   order: literal('distancia ASC'),
+   subQuery: false
+  });
+
+  // --- LÓGICA DE AGREGAÇÃO CORRIGIDA E MAIS SEGURA ---
+  const resultadoAgregado = empresas.reduce((acc, current) => {
+   const empresaData = current.get({ plain: true });
+   let empresaExistente = acc.find(e => e.id === empresaData.id);
+
+   if (!empresaExistente) {
+    // Se a empresa não está no acumulador, adiciona-a.
+    // O serviço é colocado dentro de um array se existir, senão, um array vazio.
+    acc.push({
+     ...empresaData,
+     servicos: empresaData.servicos ? [empresaData.servicos] : []
     });
+   } else {
+    // Se a empresa já existe, verifica se o serviço atual já foi adicionado.
+    // A VERIFICAÇÃO DE SEGURANÇA é `empresaData.servicos && ...`
+    if (empresaData.servicos && !empresaExistente.servicos.some(s => s.id === empresaData.servicos.id)) {
+     empresaExistente.servicos.push(empresaData.servicos);
+    }
+   }
+   return acc;
+  }, []);
 
-    // O resultado pode conter empresas duplicadas por causa do JOIN com serviços.
-    // Vamos agregar os resultados em JavaScript.
-    const resultadoAgregado = empresas.reduce((acc, current) => {
-      const empresaData = current.get({ plain: true });
-      let empresaExistente = acc.find(e => e.id === empresaData.id);
+  res.status(200).json(resultadoAgregado);
 
-      if (!empresaExistente) {
-        // Se a empresa não está no acumulador, adiciona-a com seu primeiro serviço
-        empresaExistente = {
-            ...empresaData,
-            servicos: empresaData.servicos ? [empresaData.servicos] : []
-        };
-        acc.push(empresaExistente);
-      } else {
-        // Se a empresa já existe, apenas adiciona o novo serviço se ele não estiver lá
-        const servicoJaExiste = empresaExistente.servicos.some(s => s.id === empresaData.servicos.id);
-        if (empresaData.servicos && !servicoJaExiste) {
-            empresaExistente.servicos.push(empresaData.servicos);
-        }
-      }
-      return acc;
-    }, []);
-
-    res.status(200).json(resultadoAgregado);
-
-  } catch (err) {
-    console.error('Erro ao buscar empresas próximas:', err);
-    res.status(500).json({ erro: 'Erro ao buscar empresas', detalhe: err.message });
-  }
+ } catch (err) {
+  // O catch agora vai funcionar como esperado, retornando um erro JSON.
+  logger.error('❌ Erro fatal ao buscar empresas próximas', { error: err.message, stack: err.stack });
+  res.status(500).json({ erro: 'Ocorreu um erro no servidor ao buscar as empresas.', detalhe: err.message });
+ }
 };
 
 export const getEmpresaById = async (req, res) => {
