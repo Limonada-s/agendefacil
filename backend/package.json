@@ -4,7 +4,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --detectOpenHandles",
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
@@ -34,9 +34,15 @@
   },
   "description": "",
   "devDependencies": {
+    "@babel/core": "^7.28.0",
+    "@babel/preset-env": "^7.28.0",
+    "babel-jest": "^30.0.5",
     "gerador-validador-cpf": "^6.3.0",
     "jest": "^30.0.5",
     "sequelize-cli": "^6.6.3",
     "supertest": "^7.1.4"
+  },
+  "jest": {
+    "transform": {}
   }
 }

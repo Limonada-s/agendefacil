@@ -16,18 +16,17 @@ export const runSeed = async () => {
       defaults: {
         id: 10,
         nome_empresa: 'Empresa Teste Docker',
-        // ===================================================================
-        // CORREÇÃO FINAL: Limpamos o CNPJ e o CPF antes de salvar
-        // ===================================================================
         cnpj: cleanDocument('48.770.717/0001-49'),
         nome_dono: 'Admin Teste',
         cpf_dono: cleanDocument('348.295.170-50'),
         email_admin: 'teste@docker.com',
         telefone: '11999999999',
         senha: await bcrypt.hash('123456', 10),
-        subscription_status: 'active',
+        // --- CORREÇÃO APLICADA AQUI ---
+        // Usamos camelCase para corresponder à definição do modelo Sequelize
+        subscriptionStatus: 'active', 
         status: 'active',
-        subscription_end_date: new Date(new Date().setMonth(new Date().getMonth() + 1)),
+        subscriptionEndDate: new Date(new Date().setMonth(new Date().getMonth() + 1)),
       }
     });
 

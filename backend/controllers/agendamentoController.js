@@ -6,7 +6,6 @@ import { Op } from 'sequelize';
 import { getDay, parse, format } from 'date-fns';
 import { sendAppointmentConfirmationEmail } from '../utils/sendAppointmentEmails.js';
 
-
 const { Agendamento, Login, Servico, Empresa, Professional, Review } = db;
 
 export const criarAgendamento = async (req, res) => {
@@ -14,8 +13,23 @@ export const criarAgendamento = async (req, res) => {
     const clienteLogado = req.user;
     const { data, hora, servico_id, company_id, professional_id, observacoes } = req.body;
 
-    if (!data || !hora || !servico_id || !company_id) {
+    if (!data || !hora || !servico_id || !company_id || !professional_id) {
       return res.status(400).json({ erro: 'Campos obrigatórios estão faltando.' });
+    }
+
+    // --- CORREÇÃO ---
+    // Usar findOne para verificar se o horário já existe, em vez de create.
+    const existingAppointment = await Agendamento.findOne({
+      where: {
+        professionalId: professional_id,
+        data: data,
+        hora: hora,
+        status: { [Op.notIn]: ['cancelado_pelo_cliente', 'cancelado_pela_empresa'] }
+      }
+    });
+
+    if (existingAppointment) {
+      return res.status(400).json({ erro: 'Este horário não está mais disponível.' });
     }
 
     const agendamento = await Agendamento.create({
@@ -31,13 +45,13 @@ export const criarAgendamento = async (req, res) => {
 
     logger.info('✅ Agendamento criado com sucesso', { agendamentoId: agendamento.id });
 
-    if(agendamento) {
+    // Envio de e-mail em segundo plano
+    if (agendamento) {
       sendAppointmentConfirmationEmail(agendamento.id).catch(err => {
         logger.error('Falha no envio de email em segundo plano', { error: err.message });
-      })
+      });
     }
 
-    logger.info('✅ Agendamento criado com sucesso', { agendamentoId: agendamento.id });
     res.status(201).json(agendamento);
   } catch (error) {
     logger.error('❌ ERRO AO CRIAR AGENDAMENTO', { error: error.message, stack: error.stack });
@@ -48,9 +62,10 @@ export const criarAgendamento = async (req, res) => {
 export const listarAgendamentos = async (req, res) => {
   try {
     const whereClause = {};
+    // Se o usuário logado tiver um companyId, ele é da empresa.
     if (req.user.companyId) {
       whereClause.companyId = req.user.companyId;
-    } else {
+    } else { // Senão, é um cliente.
       whereClause.clientId = req.user.id;
     }
 
@@ -59,7 +74,7 @@ export const listarAgendamentos = async (req, res) => {
       include: [
         { model: db.Login, as: 'client', attributes: ['nome', 'email'] },
         { model: db.Servico, as: 'servico', attributes: ['name', 'price'] },
-        { model: db.Empresa, as: 'company', attributes: ['nome_empresa'], where: { status: 'active' }, required: true },
+        { model: db.Empresa, as: 'company', attributes: ['nome_empresa'] },
         { model: db.Professional, as: 'professional', include: [{ model: db.Login, as: 'loginDetails', attributes: ['nome'] }] },
         { model: db.Review, as: 'review', attributes: ['id', 'rating'], required: false }
       ],
@@ -73,30 +88,50 @@ export const listarAgendamentos = async (req, res) => {
   }
 };
 
+
+// --- CONTROLLER CORRIGIDO E UNIFICADO ---
 export const alterarStatusAgendamento = async (req, res) => {
   try {
     const { id } = req.params;
-    const companyId = req.user.id;
+    const { status } = req.body;
+    const usuarioLogado = req.user;
+
     const agendamento = await db.Agendamento.findByPk(id);
     if (!agendamento) {
       return res.status(404).json({ erro: 'Agendamento não encontrado.' });
     }
-    if (agendamento.companyId !== companyId) {
+
+    // Verifica a permissão:
+    // O usuário pode alterar se for o cliente do agendamento OU se pertencer à empresa do agendamento.
+    const isClientOwner = agendamento.clientId === usuarioLogado.id;
+    const isCompanyOwner = agendamento.companyId === usuarioLogado.companyId;
+
+    if (!isClientOwner && !isCompanyOwner) {
       return res.status(403).json({ erro: 'Você não tem permissão para alterar este agendamento.' });
     }
-    await agendamento.update(req.body);
-    logger.info('⚙️ Agendamento atualizado', { agendamentoId: id, dados: req.body });
+    
+    // Validação específica para o cliente
+    if(isClientOwner && !isCompanyOwner) {
+        if(status !== 'cancelado_pelo_cliente') {
+            return res.status(403).json({ erro: 'Clientes só podem cancelar seus próprios agendamentos.' });
+        }
+    }
+
+    await agendamento.update({ status });
+    logger.info('⚙️ Agendamento atualizado', { agendamentoId: id, novoStatus: status });
     res.status(200).json(agendamento);
   } catch (error) {
-    logger.error('❌ Erro ao alterar agendamento', { error: error.message });
+    logger.error('❌ Erro ao alterar agendamento', { error: error.message, stack: error.stack });
     res.status(500).json({ erro: 'Erro ao alterar o agendamento.' });
   }
 };
 
+
 export const excluirAgendamento = async (req, res) => {
   try {
     const { id } = req.params;
-    const companyId = req.user.id;
+    const companyId = req.user.companyId; // Apenas a empresa pode excluir
+
     const agendamento = await db.Agendamento.findByPk(id);
     if (!agendamento) {
       return res.status(404).json({ erro: 'Agendamento não encontrado.' });
@@ -113,6 +148,7 @@ export const excluirAgendamento = async (req, res) => {
   }
 };
 
+
 export const getHorariosDisponiveis = async (req, res) => {
   try {
     const { professionalId, date, serviceId } = req.query;
@@ -126,7 +162,7 @@ export const getHorariosDisponiveis = async (req, res) => {
         where: {
           professionalId: professionalId,
           data: date,
-          status: { [Op.ne]: 'cancelado' }
+          status: { [Op.notIn]: ['cancelado_pelo_cliente', 'cancelado_pela_empresa'] }
         },
         attributes: ['hora']
       })
@@ -165,6 +201,8 @@ export const getHorariosDisponiveis = async (req, res) => {
   }
 };
 
+// Funções restantes (getMyProfessionalAppointments, getServiceHistory, etc.) permanecem as mesmas...
+// ... (cole o resto das suas funções aqui)
 export const getMyProfessionalAppointments = async (req, res) => {
   try {
     const loginId = req.user.id;
@@ -193,7 +231,7 @@ export const getServiceHistory = async (req, res) => {
     const { searchTerm, statusFilter, startDate, endDate } = req.query;
     let whereClause = {
       companyId: companyId,
-      status: { [Op.in]: ['concluido', 'cancelado'] }
+      status: { [Op.in]: ['concluido', 'cancelado_pelo_cliente', 'cancelado_pela_empresa'] }
     };
     if (statusFilter) {
       whereClause.status = statusFilter;
