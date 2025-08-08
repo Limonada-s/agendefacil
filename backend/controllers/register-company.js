@@ -9,6 +9,39 @@ const { Empresa, Categoria, Endereco, Servico, Login, Review } = db;
 
 const cleanDocument = (doc) => (doc || '').toString().replace(/\D/g, '');
 
+export const listarTodasEmpresasPublicas = async (req, res) => {
+  try {
+    const empresas = await db.Empresa.findAll({
+      where: {
+        status: 'active' // Apenas empresas ativas
+      },
+      attributes: {
+        // Excluímos dados sensíveis que não devem ir para o frontend público
+        exclude: ['senha', 'cpf_dono', 'plano', 'subscription_end_date', 'updatedAt', 'createdAt']
+      },
+      include: [
+        {
+          model: db.Endereco,
+          as: 'endereco',
+          attributes: ['rua', 'numero', 'bairro', 'city', 'state']
+        }
+      ],
+      order: [
+        ['createdAt', 'DESC'] // Mostra as mais novas primeiro
+      ]
+    });
+
+    res.status(200).json(empresas);
+
+  } catch (error) {
+    logger.error('❌ Erro ao listar todas as empresas publicamente', { 
+      error: error.message, 
+      stack: error.stack 
+    });
+    res.status(500).json({ erro: 'Erro ao buscar empresas.' });
+  }
+};
+
 export const registerCompany = async (req, res) => {
   const transaction = await db.sequelize.transaction();
   try {
@@ -183,21 +216,16 @@ export const listarEmpresasProximas = async (req, res) => {
    subQuery: false
   });
 
-  // --- LÓGICA DE AGREGAÇÃO CORRIGIDA E MAIS SEGURA ---
   const resultadoAgregado = empresas.reduce((acc, current) => {
    const empresaData = current.get({ plain: true });
    let empresaExistente = acc.find(e => e.id === empresaData.id);
 
    if (!empresaExistente) {
-    // Se a empresa não está no acumulador, adiciona-a.
-    // O serviço é colocado dentro de um array se existir, senão, um array vazio.
     acc.push({
      ...empresaData,
      servicos: empresaData.servicos ? [empresaData.servicos] : []
     });
    } else {
-    // Se a empresa já existe, verifica se o serviço atual já foi adicionado.
-    // A VERIFICAÇÃO DE SEGURANÇA é `empresaData.servicos && ...`
     if (empresaData.servicos && !empresaExistente.servicos.some(s => s.id === empresaData.servicos.id)) {
      empresaExistente.servicos.push(empresaData.servicos);
     }
@@ -208,7 +236,6 @@ export const listarEmpresasProximas = async (req, res) => {
   res.status(200).json(resultadoAgregado);
 
  } catch (err) {
-  // O catch agora vai funcionar como esperado, retornando um erro JSON.
   logger.error('❌ Erro fatal ao buscar empresas próximas', { error: err.message, stack: err.stack });
   res.status(500).json({ erro: 'Ocorreu um erro no servidor ao buscar as empresas.', detalhe: err.message });
  }

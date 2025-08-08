@@ -59,18 +59,16 @@ export const criarAgendamento = async (req, res) => {
   }
 };
 
-export const listarAgendamentos = async (req, res) => {
+
+export const listarAgendamentosEmpresa = async (req, res) => {
   try {
-    const whereClause = {};
-    // Se o usuário logado tiver um companyId, ele é da empresa.
-    if (req.user.companyId) {
-      whereClause.companyId = req.user.companyId;
-    } else { // Senão, é um cliente.
-      whereClause.clientId = req.user.id;
+    // Garante que apenas usuários da empresa possam acessar
+    if (!req.user.companyId) {
+        return res.status(403).json({ erro: 'Acesso negado. Rota apenas para empresas.' });
     }
 
     const agendamentos = await db.Agendamento.findAll({
-      where: whereClause,
+      where: { companyId: req.user.companyId }, // Filtra pela empresa do usuário logado
       include: [
         { model: db.Login, as: 'client', attributes: ['nome', 'email'] },
         { model: db.Servico, as: 'servico', attributes: ['name', 'price'] },
@@ -83,9 +81,30 @@ export const listarAgendamentos = async (req, res) => {
 
     res.json(agendamentos);
   } catch (error) {
-    logger.error('ERRO FATAL em listarAgendamentos', { service: 'api-agendefacil', errorMessage: error.message, stack: error.stack });
-    res.status(500).json({ erro: 'Erro ao buscar agendamentos.' });
+    logger.error('ERRO FATAL em listarAgendamentosEmpresa', { service: 'api-agendefacil', errorMessage: error.message, stack: error.stack });
+    res.status(500).json({ erro: 'Erro ao buscar agendamentos da empresa.' });
   }
+};
+
+export const listarAgendamentosCliente = async (req, res) => {
+    try {
+      const agendamentos = await db.Agendamento.findAll({
+        where: { clientId: req.user.id }, // Filtra pelo ID do cliente logado
+        include: [
+            { model: db.Login, as: 'client', attributes: ['nome', 'email'] },
+            { model: db.Servico, as: 'servico', attributes: ['name', 'price'] },
+            { model: db.Empresa, as: 'company', attributes: ['nome_empresa'] },
+            { model: db.Professional, as: 'professional', include: [{ model: db.Login, as: 'loginDetails', attributes: ['nome'] }] },
+            { model: db.Review, as: 'review', attributes: ['id', 'rating'], required: false }
+        ],
+        order: [['data', 'DESC'], ['hora', 'ASC']]
+      });
+  
+      res.json(agendamentos);
+    } catch (error) {
+      logger.error('ERRO FATAL em listarAgendamentosCliente', { service: 'api-agendefacil', errorMessage: error.message, stack: error.stack });
+      res.status(500).json({ erro: 'Erro ao buscar seus agendamentos.' });
+    }
 };
 
 
@@ -101,8 +120,6 @@ export const alterarStatusAgendamento = async (req, res) => {
       return res.status(404).json({ erro: 'Agendamento não encontrado.' });
     }
 
-    // Verifica a permissão:
-    // O usuário pode alterar se for o cliente do agendamento OU se pertencer à empresa do agendamento.
     const isClientOwner = agendamento.clientId === usuarioLogado.id;
     const isCompanyOwner = agendamento.companyId === usuarioLogado.companyId;
 
@@ -110,7 +127,6 @@ export const alterarStatusAgendamento = async (req, res) => {
       return res.status(403).json({ erro: 'Você não tem permissão para alterar este agendamento.' });
     }
     
-    // Validação específica para o cliente
     if(isClientOwner && !isCompanyOwner) {
         if(status !== 'cancelado_pelo_cliente') {
             return res.status(403).json({ erro: 'Clientes só podem cancelar seus próprios agendamentos.' });

@@ -1,7 +1,11 @@
+
 import express from 'express';
 import {
   criarAgendamento,
-  listarAgendamentos,
+  // --- ROTAS ATUALIZADAS ---
+  listarAgendamentosEmpresa,  
+  listarAgendamentosCliente,  
+  // -------------------------
   alterarStatusAgendamento,
   getHorariosDisponiveis,
   excluirAgendamento,
@@ -12,21 +16,24 @@ import {
 import { protect } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
+
+// --- ROTAS ATUALIZADAS ---
+
+// Rota para a EMPRESA listar todos os agendamentos
+router.get('/', protect, listarAgendamentosEmpresa);
+
+// Rota para o CLIENTE listar os seus próprios agendamentos (ESSA É A ROTA QUE FALTAVA)
+router.get('/cliente', protect, listarAgendamentosCliente);
+
+// -------------------------
+
 router.post('/', protect, criarAgendamento);
-router.get('/', protect, listarAgendamentos);
 router.put('/:id', protect, alterarStatusAgendamento);
 router.delete('/:id', protect, excluirAgendamento);
 
-
 router.get('/horarios-disponiveis', getHorariosDisponiveis);
-
-// Rota para o profissional ver seus próprios agendamentos
 router.get('/meus-agendamentos-profissional', protect, getMyProfessionalAppointments);
-
-// Rota para a empresa ver o histórico de serviços
 router.get('/history', protect, getServiceHistory);
-
-// Rota para o profissional atualizar o status de um agendamento
 router.put('/professional/:id', protect, updateAppointmentStatusByProfessional);
 
 export default router;

@@ -74,7 +74,7 @@ app.use('/api/superadmin', superAdminRoutes);
 app.use('/api/users', userRoutes); 
 app.use('/api/payments', paymentRoutes);
 app.use('/api/agendamentos', agendamentoRoutes);
-app.use('/api/servicos', servicosRoute);
+app.use('/api/servicos', servicosRoute);  
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/empresas', empresaRoutes); 
 app.use('/api/categorias', categoriaRoutes);
@@ -100,7 +100,7 @@ const start = async () => {
 
     // Apenas em ambiente de desenvolvimento, recriamos o banco e populamos
     if (process.env.NODE_ENV !== 'production') {
-      await db.sequelize.sync({ force: true });
+      await db.sequelize.sync({ alter: true });
       console.log("Banco de dados FORÇADAMENTE sincronizado.");
       await runSeed();
     }
