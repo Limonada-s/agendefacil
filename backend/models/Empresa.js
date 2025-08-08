@@ -44,13 +44,13 @@ export default (sequelize) => {
     nome_empresa: DataTypes.STRING(50),
     cnpj: {
       type: DataTypes.STRING(18), // Aumentado para suportar formatação
-      allowNull: false,
+      allowNull: true,
       unique: true,
     },
     nome_dono: DataTypes.STRING(100),
     cpf_dono: {
       type: DataTypes.STRING(14),
-      allowNull: false,
+      allowNull: true,
       unique: true
     },
     email_admin: {

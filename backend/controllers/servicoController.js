@@ -26,59 +26,79 @@ const listarServicos = async (req, res) => {
   }
 };
 
-const criarServico = async (req, res) => {
-  try {
-    const { name, description, duration, price, image, categoryId = null, professionals_ids } = req.body;
-    const companyId = req.user.companyId;
+export const criarServico = async (req, res) => {
+    try {
+        const companyId = req.user.companyId; // ID da empresa logada (do token)
+        // Inclui a captura de 'professionals_ids' do corpo da requisição
+        const { name, description, duration, price, categoryId, professionals_ids } = req.body;
 
-    if (!companyId || !name || !price) {
-      return res.status(400).json({ erro: 'Campos obrigatórios ausentes.' });
+        if (!name || !price || !duration) {
+            return res.status(400).json({ erro: 'Nome, preço e duração são obrigatórios.' });
+        }
+
+        const data = {
+            name,
+            description,
+            duration,
+            price,
+            companyId,
+            categoryId
+        };
+
+        // Adiciona a imagem se ela for enviada no formulário (via multer)
+        if (req.file) {
+            data.image = req.file.path; 
+        }
+
+        const servico = await Servico.create(data);
+
+        // Associa os profissionais ao serviço, se os IDs forem fornecidos
+        if (professionals_ids && Array.isArray(professionals_ids) && professionals_ids.length > 0) {
+            // O método 'setProfissionais' é gerado pelo Sequelize para associações Many-to-Many
+            await servico.setProfissionais(professionals_ids);
+        }
+
+        logger.info('✔️ Serviço criado com sucesso', { serviceId: servico.id, companyId });
+        res.status(201).json(servico);
+
+    } catch (error) {
+        logger.error('❌ Erro ao criar serviço', { 
+            error: error.message, 
+            companyId: req.user.companyId 
+        });
+        res.status(500).json({ erro: 'Erro interno ao criar o serviço.' });
     }
-
-    const dataToCreate = { name, description, duration, price, image, companyId };
-    if (categoryId) {
-      dataToCreate.categoryId = categoryId;
-    }
-
-    const servico = await Servico.create(dataToCreate);
-
-    if (professionals_ids && professionals_ids.length > 0) {
-      await servico.setProfissionais(professionals_ids);
-    }
-
-    logger.info('servico_criado', { serviceId: servico.id, name });
-    res.status(201).json(servico);
-  } catch (err) {
-    logger.error('erro ao criar serviço', { error: err.message });
-    res.status(500).json({ erro: 'Erro ao criar serviço' });
-  }
 };
 
-const atualizarServico = async (req, res) => {
-  try {
-    const { id } = req.params;
-    // ===== ADIÇÃO: Recebendo a lista de IDs de profissionais =====
-    const { name, description, duration, price, image, categoryId = null, professionals_ids } = req.body;
-    const servico = await Servico.findByPk(id);
-    if (!servico) {
-      return res.status(404).json({ erro: 'Serviço não encontrado.' });
-    }
+export const atualizarServico = async (req, res) => {
+    try {
+        const { servicoId } = req.params;
+        const companyId = req.user.companyId;
+        const updateData = req.body;
 
-    const dataToUpdate = { name, description, duration, price, image };
-    if (categoryId) {
-      dataToUpdate.categoryId = categoryId;
-    }
-    await servico.update(dataToUpdate);
-    if (professionals_ids !== undefined) {
-        await servico.setProfissionais(professionals_ids);
-    }
+        const servico = await Servico.findOne({ where: { id: servicoId, companyId } });
 
-    logger.info('servico_atualizado', { serviceId: id });
-    res.json(servico);
-  } catch (err) {
-    logger.error('erro ao atualizar serviço', { error: err.message });
-    res.status(500).json({ erro: 'Erro ao atualizar serviço' });
-  }
+        if (!servico) {
+            return res.status(404).json({ erro: 'Serviço não encontrado ou não pertence à sua empresa.' });
+        }
+
+        // Passo 5: Atualiza a imagem se uma nova for enviada
+        if (req.file) {
+            updateData.image = req.file.path;
+        }
+
+        await servico.update(updateData);
+
+        logger.info('✔️ Serviço atualizado com sucesso', { serviceId });
+        res.status(200).json(servico);
+
+    } catch (error) {
+        logger.error('❌ Erro ao atualizar serviço', { 
+            error: error.message, 
+            serviceId: req.params.servicoId 
+        });
+        res.status(500).json({ erro: 'Erro interno ao atualizar o serviço.' });
+    }
 };
 
 const excluirServico = async (req, res) => {

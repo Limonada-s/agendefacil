@@ -1,20 +1,17 @@
 // Em: src/pages/CompanyRegistrationPage.jsx
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from '@/components/ui/use-toast';
-import { Building, User, Mail, Phone, MapPin, Lock, CheckCircle, ArrowLeft, ListChecks, Loader2 } from 'lucide-react';
+import { Building, User, Mail, Phone, MapPin, Lock, CheckCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { mainCompanyCategories } from '@/lib/companyCategories';
 import GooglePlacesAutocomplete, { geocodeByAddress } from 'react-google-places-autocomplete';
 import { formatCPF, formatCNPJ } from '@/lib/formatters';
-import api from '@/services/api';
 
 // Componente para mostrar os critérios de senha
 const PasswordStrengthIndicator = ({ criteria }) => (
@@ -39,7 +36,6 @@ const CompanyRegistrationPage = () => {
   const { registerCompanyAndLogin } = useAuth();
   const { toast } = useToast();
 
-  const [selectedCategories, setSelectedCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [passwordCriteria, setPasswordCriteria] = useState({
     length: false,
@@ -65,6 +61,7 @@ const CompanyRegistrationPage = () => {
     confirmPassword: ''
   });
   
+  // Estilos para o componente de autocomplete do Google
   const customGooglePlacesStyles = {
     control: (provided) => ({ ...provided, backgroundColor: 'var(--input)', borderColor: 'var(--border)', boxShadow: 'none', '&:hover': { borderColor: 'var(--ring)', }, }),
     input: (provided) => ({ ...provided, color: 'var(--foreground)', }),
@@ -122,25 +119,17 @@ const CompanyRegistrationPage = () => {
     }
   };
 
-  const handleCategoryChange = (categoryId) => {
-    setSelectedCategories(prev => {
-      if (prev.includes(categoryId)) {
-        return prev.filter(id => id !== categoryId);
-      } else {
-        if (prev.length < 10) { return [...prev, categoryId]; } 
-        else {
-          toast({ title: "Limite Atingido", description: "Você pode selecionar no máximo 10 categorias." });
-          return prev;
-        }
-      }
-    });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validações
     if (formData.password !== formData.confirmPassword) {
       toast({ title: "Erro de Senha", description: "As senhas não conferem.", variant: "destructive" });
       return;
+    }
+    if (!formData.ownerCpf && !formData.cnpj) {
+        toast({ title: "Documento Faltando", description: "Por favor, preencha o CPF ou o CNPJ.", variant: "destructive" });
+        return;
     }
     if (!formData.rua || !formData.city) {
       toast({ title: "Endereço Incompleto", description: "Por favor, selecione um endereço válido na busca.", variant: "destructive" });
@@ -158,6 +147,7 @@ const CompanyRegistrationPage = () => {
 
     setIsLoading(true);
     try {
+      // REMOVIDO: 'categorias' do payload de registro
       const registrationData = {
         nome_empresa: formData.companyName,
         cnpj: formData.cnpj,
@@ -166,7 +156,6 @@ const CompanyRegistrationPage = () => {
         email_admin: formData.email,
         telefone: formData.phone,
         senha: formData.password,
-        categorias: selectedCategories,
         endereco: {
             rua: formData.rua,
             numero: formData.numero,
@@ -209,26 +198,7 @@ const CompanyRegistrationPage = () => {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               
-              <div className="space-y-2 p-4 border rounded-md bg-card-foreground/5">
-                <Label className="flex items-center text-lg font-semibold text-foreground"><ListChecks className="mr-2 h-5 w-5 text-primary" /> Categorias de Atendimento</Label>
-                <p className="text-sm text-muted-foreground mb-3">Selecione as principais categorias que sua empresa atenderá (máximo 10).</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-2">
-                  {mainCompanyCategories.map(category => (
-                    <div key={category.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
-                      <Checkbox
-                        id={`category-${category.id}`}
-                        checked={selectedCategories.includes(category.id)}
-                        onCheckedChange={() => handleCategoryChange(category.id)}
-                        disabled={isLoading || (selectedCategories.length >= 10 && !selectedCategories.includes(category.id))}
-                      />
-                      <Label htmlFor={`category-${category.id}`} className="text-sm font-normal cursor-pointer flex-1">
-                        {category.label} <span className="text-xs text-muted-foreground">({category.group})</span>
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">{selectedCategories.length} de 10 categorias selecionadas.</p>
-              </div>
+              {/* REMOVIDO: Bloco inteiro de seleção de categorias */}
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-1">
@@ -236,8 +206,8 @@ const CompanyRegistrationPage = () => {
                   <Input id="companyName" name="companyName" value={formData.companyName} onChange={handleInputChange} placeholder="Ex: Salão Beleza Pura" required disabled={isLoading}/>
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="cnpj" className="flex items-center"><Building className="mr-2 h-4 w-4 text-primary" /> CNPJ</Label>
-                  <Input id="cnpj" name="cnpj" value={formData.cnpj} onChange={handleInputChange} placeholder="00.000.000/0000-00" required disabled={isLoading}/>
+                  <Label htmlFor="cnpj" className="flex items-center"><Building className="mr-2 h-4 w-4 text-primary" /> CNPJ (Opcional se CPF preenchido)</Label>
+                  <Input id="cnpj" name="cnpj" value={formData.cnpj} onChange={handleInputChange} placeholder="00.000.000/0000-00" disabled={isLoading}/>
                 </div>
               </div>
               
@@ -247,8 +217,8 @@ const CompanyRegistrationPage = () => {
                   <Input id="ownerName" name="ownerName" value={formData.ownerName} onChange={handleInputChange} placeholder="Nome completo" required disabled={isLoading}/>
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="ownerCpf" className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> CPF do Proprietário/Responsável</Label>
-                  <Input id="ownerCpf" name="ownerCpf" value={formData.ownerCpf} onChange={handleInputChange} placeholder="000.000.000-00" required disabled={isLoading}/>
+                  <Label htmlFor="ownerCpf" className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> CPF (Opcional se CNPJ preenchido)</Label>
+                  <Input id="ownerCpf" name="ownerCpf" value={formData.ownerCpf} onChange={handleInputChange} placeholder="000.000.000-00" disabled={isLoading}/>
                 </div>
               </div>
               
@@ -279,12 +249,12 @@ const CompanyRegistrationPage = () => {
                   />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
-                  <div className="sm:col-span-4 space-y-1"><Label htmlFor="rua">Rua</Label><Input id="rua" name="rua" value={formData.rua} onChange={handleInputChange} /></div>
-                  <div className="sm:col-span-2 space-y-1"><Label htmlFor="numero">Número</Label><Input id="numero" name="numero" value={formData.numero} onChange={handleInputChange} /></div>
-                  <div className="sm:col-span-3 space-y-1"><Label htmlFor="bairro">Bairro</Label><Input id="bairro" name="bairro" value={formData.bairro} onChange={handleInputChange} /></div>
-                  <div className="sm:col-span-3 space-y-1"><Label htmlFor="city">Cidade</Label><Input id="city" name="city" value={formData.city} onChange={handleInputChange} /></div>
-                  <div className="sm:col-span-2 space-y-1"><Label htmlFor="state">Estado</Label><Input id="state" name="state" value={formData.state} onChange={handleInputChange} /></div>
-                  <div className="sm:col-span-4 space-y-1"><Label htmlFor="zipCode">CEP</Label><Input id="zipCode" name="zipCode" value={formData.zipCode} onChange={handleInputChange} /></div>
+                  <div className="sm:col-span-4 space-y-1"><Label htmlFor="rua">Rua</Label><Input id="rua" name="rua" value={formData.rua} onChange={handleInputChange} required/></div>
+                  <div className="sm:col-span-2 space-y-1"><Label htmlFor="numero">Número</Label><Input id="numero" name="numero" value={formData.numero} onChange={handleInputChange} required/></div>
+                  <div className="sm:col-span-3 space-y-1"><Label htmlFor="bairro">Bairro</Label><Input id="bairro" name="bairro" value={formData.bairro} onChange={handleInputChange} required/></div>
+                  <div className="sm:col-span-3 space-y-1"><Label htmlFor="city">Cidade</Label><Input id="city" name="city" value={formData.city} onChange={handleInputChange} required/></div>
+                  <div className="sm:col-span-2 space-y-1"><Label htmlFor="state">Estado</Label><Input id="state" name="state" value={formData.state} onChange={handleInputChange} required/></div>
+                  <div className="sm:col-span-4 space-y-1"><Label htmlFor="zipCode">CEP</Label><Input id="zipCode" name="zipCode" value={formData.zipCode} onChange={handleInputChange} required/></div>
                 </div>
               </div>
 

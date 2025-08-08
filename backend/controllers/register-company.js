@@ -53,17 +53,26 @@ export const registerCompany = async (req, res) => {
       email_admin,
       telefone,
       senha,
-      categorias,
       endereco: enderecoData
     } = req.body;
 
     if (process.env.NODE_ENV !== 'test') {
-      if (!isValidCPF(cpf_dono)) {
-        return res.status(400).json({ erro: 'O CPF informado é inválido.' });
-      }
-      if (!isValidCNPJ(cnpj)) {
-        return res.status(400).json({ erro: 'O CNPJ informado é inválido.' });
-      }
+      if (!cpf_dono && !cnpj) {
+            await transaction.rollback();
+            return res.status(400).json({ erro: 'É necessário fornecer um CPF ou um CNPJ.' });
+        }
+        if (cpf_dono && !isValidCPF(cpf_dono)) {
+            await transaction.rollback();
+            return res.status(400).json({ erro: 'O CPF informado é inválido.' });
+        }
+        if (cnpj && !isValidCNPJ(cnpj)) {
+            await transaction.rollback();
+            return res.status(400).json({ erro: 'O CNPJ informado é inválido.' });
+        }
+        if (!senha) {
+            await transaction.rollback();
+            return res.status(400).json({ erro: "O campo 'senha' é obrigatório." });
+        }
     }
 
     logger.info('📦 Início do registro de empresa', { nome_empresa, email_admin });
@@ -72,8 +81,16 @@ export const registerCompany = async (req, res) => {
       throw new Error("O campo 'senha' é obrigatório.");
     }
 
-    const cleanCnpj = cleanDocument(cnpj);
-    const cleanCpf = cleanDocument(cpf_dono);
+    const cleanCnpj = cnpj ? cleanDocument(cnpj) : null;
+    const cleanCpf = cpf_dono ? cleanDocument(cpf_dono) : null;
+
+    const orConditions = [{ email_admin: email_admin }];
+    if (cleanCnpj) {
+      orConditions.push({ cnpj: cleanCnpj });
+    }
+    if (cleanCpf) {
+      orConditions.push({ cpf_dono: cleanCpf });
+    }
 
     const existingCompany = await Empresa.findOne({
       where: {
@@ -155,9 +172,6 @@ export const registerCompany = async (req, res) => {
       companyId: empresa.id
     }, { transaction });
     
-    if (categorias && categorias.length > 0) {
-      await empresa.setCategorias(categorias, { transaction });
-    }
 
     await transaction.commit();
 

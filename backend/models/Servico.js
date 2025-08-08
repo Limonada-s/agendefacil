@@ -37,7 +37,10 @@ export default (sequelize) => {
       type: DataTypes.DECIMAL(10, 2),
       defaultValue: 0.00
     },
-    image: DataTypes.TEXT,
+    image: {
+      type: DataTypes.TEXT, 
+      allowNull: true       
+    },
     companyId: DataTypes.INTEGER,
     categoryId: {
       type: DataTypes.INTEGER,

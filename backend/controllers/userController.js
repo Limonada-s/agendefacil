@@ -1,50 +1,65 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import db from '../models/index.js'; 
+import db from '../models/index.js';
 import logger from '../logger.js';
-import sendEmail from '../utils/sendEmail.js'; 
 import { isValidCPF } from '../utils/validators.js';
+import sendEmail from '../utils/sendEmail.js';
 
 const SECRET = process.env.JWT_SECRET;
 const { Login, Empresa, Professional } = db;
+
+const cleanDocument = (doc) => (doc || '').toString().replace(/\D/g, '');
 
 const generateToken = (payload) => {
   return jwt.sign(payload, SECRET, { expiresIn: '2d' });
 };
 
-const register = async (req, res) => {
-  const { nome, email, senha, cpf, telefone, data_nascimento } = req.body;
-  
-  if (!nome || !email || !senha || !cpf || !telefone || !data_nascimento) {
-    return res.status(400).json({ erro: 'Todos os campos são obrigatórios' });
-  }
-  if (!isValidCPF(cpf)) {
-    return res.status(400).json({ erro: 'O CPF informado é inválido.' });
-  }
+export const register = async (req, res) => {
+    const { nome, email, senha, cpf, telefone, data_nascimento } = req.body;
 
-  try {
-    const existe = await Login.findOne({ where: { email } });
-    if (existe) {
-      return res.status(400).json({ erro: 'Email já cadastrado' });
+    if (!nome || !email || !senha || !cpf || !telefone || !data_nascimento) {
+        return res.status(400).json({ erro: 'Todos os campos são obrigatórios' });
     }
-    const cpfExiste = await Login.findOne({ where: { cpf } });
-    if (cpfExiste) {
-        return res.status(400).json({ erro: 'CPF já cadastrado' });
+
+    // 1. Valida o formato do CPF original (com máscara)
+    if (!isValidCPF(cpf)) {
+        return res.status(400).json({ erro: 'O CPF informado é inválido.' });
     }
-    const hash = await bcrypt.hash(senha, 10);
-    await Login.create({ nome, email, senha: hash, cpf, telefone, data_nascimento, tipo: 'cliente' });
-    
-    res.status(201).json({ mensagem: 'Cliente cadastrado com sucesso' });
-  } catch (error) {
-    logger.error('erro no registro de cliente', { error: error.message });
-    res.status(500).json({ erro: 'Erro no registro' });
-  }
+
+    // 2. Limpa o CPF para salvar e verificar duplicidade
+    const cleanCpf = cleanDocument(cpf);
+
+    try {
+        const existeEmail = await Login.findOne({ where: { email } });
+        if (existeEmail) {
+            return res.status(400).json({ erro: 'Email já cadastrado' });
+        }
+
+        const existeCpf = await Login.findOne({ where: { cpf: cleanCpf } });
+        if (existeCpf) {
+            return res.status(400).json({ erro: 'CPF já cadastrado' });
+        }
+
+        const hash = await bcrypt.hash(senha, 10);
+
+        // 3. Salva o CPF limpo (apenas números) no banco de dados
+        await Login.create({
+            nome,
+            email,
+            senha: hash,
+            cpf: cleanCpf, // Salva o CPF sem formatação
+            telefone,
+            data_nascimento,
+            tipo: 'cliente'
+        });
+
+        res.status(201).json({ mensagem: 'Cliente cadastrado com sucesso' });
+    } catch (error) {
+        logger.error('Erro no registro de cliente', { error: error.message });
+        res.status(500).json({ erro: 'Erro interno no servidor ao registrar cliente.' });
+    }
 };
 
-
-// ===================================================================
-// FUNÇÃO DE LOGIN CORRIGIDA E UNIFICADA (VERSÃO FINAL)
-// ===================================================================
 const login = async (req, res) => {
   const { email, senha } = req.body;
   try {
