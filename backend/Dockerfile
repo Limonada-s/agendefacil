@@ -1,3 +1,4 @@
+ARG CACHEBUST=1
 # Use uma imagem base oficial do Node.js na versão Long-Term Support (LTS)
 FROM node:lts
 
