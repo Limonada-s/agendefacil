@@ -1,23 +1,24 @@
 // Em: src/server.js
 
-console.log('>>>> AMBIENTE DETETADO:', process.env.NODE_ENV); // <-- LINHA DE DEPURAÇÃO ADICIONADA
-
+// Importações de Módulos
 import express from "express";
-import db from "./models/index.js"; 
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import path from 'path';
-import logger from './logger.js';
-import { v4 as uuid } from 'uuid';
-import { startReminderScheduler } from './scheduler/appointmentScheduler.js'
 import dotenv from 'dotenv';
+import { v4 as uuid } from 'uuid';
 
+// Carrega variáveis de ambiente do arquivo .env
 dotenv.config();
-import { runSeed } from './seeders/run-seed.js';
 
-// Importação de rotas
+// Módulos da Aplicação
+import db from "./models/index.js"; 
+import logger from './logger.js';
+import { startReminderScheduler } from './scheduler/appointmentScheduler.js';
+
+// Importação de Rotas
 import userRoutes from './routes/userRoutes.js';
 import agendamentoRoutes from './routes/agendamentoRoutes.js';
 import servicosRoute from './routes/servicosRoute.js';
@@ -30,13 +31,16 @@ import superAdminRoutes from './routes/superAdminRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 
-
+// Configuração de caminhos de diretório (ESM)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Inicialização do Express
 const app = express();
 
-// Middleware de log de requisições
+// --- Middlewares ---
+
+// 1. Log de Requisições
 app.use((req, res, next) => {
   const requestId = uuid();
   res.locals.requestId = requestId;
@@ -53,7 +57,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Middlewares
+// 2. CORS (Cross-Origin Resource Sharing)
 const allowedOrigins = ['http://localhost:5173', 'https://agendefacil.vercel.app'];
 app.use(cors({
   origin: function (origin, callback) {
@@ -66,27 +70,14 @@ app.use(cors({
   credentials: true
 }));
 
+// 3. Middlewares Padrão
 app.use(cookieParser());
 app.use(express.json());
 
-// Middleware para permitir que o frontend simule requisições PUT/DELETE
-app.use((req, res, next) => {
-  if (req.originalUrl.startsWith('/api/servicos/')) {
-    logger.info('DEBUG: Method Override Check', {
-      requestId: res.locals.requestId,
-      originalMethod: req.originalMethod,
-      newMethod: req.method,
-      body: req.body,
-    });
-  }
-  next();
-});
-
-// Torna a pasta 'uploads' estática para que as imagens possam ser acessadas pela URL
+// 4. Servir arquivos estáticos da pasta 'uploads'
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-
-// Rotas da API
+// --- Rotas da API ---
 app.use('/api/superadmin', superAdminRoutes);
 app.use('/api/users', userRoutes); 
 app.use('/api/payments', paymentRoutes);
@@ -99,40 +90,48 @@ app.use('/api/profissionais', professionalRoutes);
 app.use('/api/financials', financialsRoutes);
 app.use('/api', sessionTestRoute); 
 
+// --- Tratamento de Erros ---
 app.use((err, req, res, next) => {
   logger.error('error_log', {
     requestId: res.locals.requestId,
     message: err.message,
     stack: err.stack
   });
-  res.status(500).json({ error: 'Erro interno no servidor' });
+  res.status(500).json({ error: 'Erro interno no servidor.' });
 });
 
-let server 
+// --- Inicialização do Servidor ---
+let server;
 
-const start = async () => {
+const startServer = async () => {
   try {
+    console.log("Tentando conectar ao banco de dados...");
     await db.sequelize.authenticate();
-    console.log("Conectado ao PostgreSQL!");
+    console.log("✅ Conexão com o PostgreSQL estabelecida com sucesso!");
 
-    if (process.env.NODE_ENV !== 'production') {
-      // Lógica de seed...
-    }
-
+    // A porta é definida pela variável de ambiente PORT (fornecida pelo Cloud Run)
+    // ou 5000 como padrão para desenvolvimento local.
     const PORT = process.env.PORT || 5000;
+    
     server = app.listen(PORT, () => {
-      console.log(`Rodando na porta ${PORT}`);
+      console.log(`🚀 Servidor rodando na porta ${PORT}`);
+      logger.info(`Servidor iniciado na porta ${PORT} no ambiente ${process.env.NODE_ENV || 'development'}`);
+      
+      // Inicia tarefas agendadas
       startReminderScheduler(); 
-      logger.info("Servidor iniciado.");
     });
 
   } catch (error) {
-    console.error("Erro na inicialização do servidor:", error);
+    console.error("❌ Falha na inicialização do servidor:", error);
+    logger.error("Falha na inicialização do servidor:", { message: error.message, stack: error.stack });
+    process.exit(1); // Encerra o processo se não conseguir conectar ao DB
   }
 };
 
+// Garante que o servidor só inicie se não estiver em um ambiente de teste
 if (process.env.NODE_ENV !== 'test') {
-  start();
+  startServer();
 }
 
+// Exporta para possíveis testes
 export { app, server, db };
