@@ -1,6 +1,5 @@
 import { Sequelize } from 'sequelize';
 import dbConfig from '../config/database.js';
-import logger from '../logger.js';
 
 import defineLogin from './Login.js';
 import defineEmpresa from './Empresa.js';
@@ -13,7 +12,6 @@ import defineExpense from './Expense.js';
 import defineReview from './Review.js';
 import defineAppLog from './AppLog.js';
 
-console.log('[models/index.js] Configuração recebida para criar Sequelize:', dbConfig);
 
 const sequelize = new Sequelize(
   dbConfig.database,
@@ -21,7 +19,6 @@ const sequelize = new Sequelize(
   dbConfig.password,
   {
     ...dbConfig,
-    logging: (msg) => logger.debug(msg),
   }
 );
 
