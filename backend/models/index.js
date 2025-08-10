@@ -1,6 +1,6 @@
-// models/index.js
-import Sequelize from 'sequelize';
+import { Sequelize } from 'sequelize';
 import dbConfig from '../config/database.js';
+import logger from '../logger.js';
 
 import defineLogin from './Login.js';
 import defineEmpresa from './Empresa.js';
@@ -9,20 +9,22 @@ import defineEndereco from './Endereco.js';
 import defineServico from './Servico.js';
 import defineAgendamento from './Agendamento.js';
 import defineProfessional from './Professional.js';
-import defineExpense from './Expense.js'
+import defineExpense from './Expense.js';
 import defineReview from './Review.js';
 import defineAppLog from './AppLog.js';
-import logger from '../logger.js';
 
+// A inicialização do Sequelize agora usa o operador 'spread' (...) para passar
+// todas as opções corretas (host para dev, dialectOptions para prod).
 const sequelize = new Sequelize(
   dbConfig.database,
   dbConfig.username,
   dbConfig.password,
   {
-    ...dbConfig, 
+    ...dbConfig,
     logging: (msg) => logger.debug(msg),
   }
 );
+
 const db = {};
 
 db.Login = defineLogin(sequelize);
@@ -32,7 +34,7 @@ db.Endereco = defineEndereco(sequelize);
 db.Servico = defineServico(sequelize);
 db.Agendamento = defineAgendamento(sequelize);
 db.Professional = defineProfessional(sequelize);
-db.Expense = defineExpense(sequelize)
+db.Expense = defineExpense(sequelize);
 db.Review = defineReview(sequelize);
 db.AppLog = defineAppLog(sequelize); 
 
