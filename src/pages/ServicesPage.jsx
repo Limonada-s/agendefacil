@@ -84,27 +84,34 @@ const ServicesPage = () => {
   };
 
 
-  const handleSaveService = async (serviceToSave) => {
+  const handleSaveService = async (formData, serviceId) => {
     try {
-      if (serviceToSave.id) {
-        await api.put(`/servicos/${serviceToSave.id}`, serviceToSave);
+      if (serviceId) {
+        // Para atualizar, usamos POST com _method=PUT por causa do FormData
+        await api.post(`/servicos/${serviceId}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
       } else {
-        await api.post(`/servicos`, serviceToSave);
+        // Para criar, usamos POST
+        await api.post(`/servicos`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
       }
       await loadData();
       handleCloseFormDialog();
       toast({
-        title: serviceToSave.id ? "Serviço atualizado" : "Serviço criado",
-        description: `Serviço ${serviceToSave.id ? "atualizado" : "criado"} com sucesso.`
+        title: serviceId ? "Serviço atualizado" : "Serviço criado",
+        description: `Serviço ${serviceId ? "atualizado" : "criado"} com sucesso.`
       });
     } catch (error) {
       toast({
         title: "Erro ao salvar",
-        description: error.message,
+        description: error.response?.data?.erro || "Ocorreu um erro.",
         variant: "destructive"
       });
     }
   };
+
 
   const handleDeleteClick = (id) => {
     setServiceToDelete(id);

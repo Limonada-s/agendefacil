@@ -20,6 +20,7 @@ const router = express.Router();
 // --- ROTAS ATUALIZADAS ---
 
 // Rota para a EMPRESA listar todos os agendamentos
+
 router.get('/empresa', protect, listarAgendamentosEmpresa);
 
 // Rota para o CLIENTE listar os seus próprios agendamentos (ESSA É A ROTA QUE FALTAVA)

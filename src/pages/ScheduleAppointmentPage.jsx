@@ -172,14 +172,23 @@ const ScheduleAppointmentPage = () => {
           </CardHeader>
 
           <CardContent className="space-y-6 p-6">
-            <div className="p-4 border border-primary/20 rounded-lg bg-primary/5">
-              <div className="flex items-center mb-2">
-                <Scissors className="h-5 w-5 mr-2 text-primary" />
-                <h3 className="font-semibold text-lg">{service.name}</h3>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="flex items-center text-muted-foreground"><Clock className="h-4 w-4 mr-1" /> Duração: {service.duration} min</span>
-                <span className="flex items-center font-medium text-primary"><DollarSign className="h-4 w-4 mr-1" /> {formatCurrency(service.price)}</span>
+            {/* Bloco de Informações do Serviço com Imagem */}
+            <div className="p-4 border border-primary/20 rounded-lg bg-primary/5 flex flex-col sm:flex-row items-center gap-4">
+              {service.image && (
+                <div className="w-full sm:w-32 h-32 sm:h-auto flex-shrink-0 rounded-md overflow-hidden bg-muted">
+                  <img src={service.image} alt={service.name} className="w-full h-full object-cover" />
+                </div>
+              )}
+              <div className="flex-grow">
+                <div className="flex items-center mb-2">
+                  <Scissors className="h-5 w-5 mr-2 text-primary" />
+                  <h3 className="font-semibold text-lg">{service.name}</h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{service.description}</p>
+                <div className="flex justify-between text-sm">
+                  <span className="flex items-center text-muted-foreground"><Clock className="h-4 w-4 mr-1" /> Duração: {service.duration} min</span>
+                  <span className="flex items-center font-medium text-primary"><DollarSign className="h-4 w-4 mr-1" /> {formatCurrency(service.price)}</span>
+                </div>
               </div>
             </div>
             

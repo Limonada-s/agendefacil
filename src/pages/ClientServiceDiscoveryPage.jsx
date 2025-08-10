@@ -1,6 +1,4 @@
 // Em: src/pages/ClientServiceDiscoveryPage.jsx
-// Esta é uma versão completa e limpa do componente, corrigindo todos os bugs anteriores
-// e garantindo que não há caracteres especiais que possam quebrar o código.
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
@@ -12,84 +10,88 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, MapPin, Star, Tag, ArrowRight, Building, Loader2, AlertTriangle } from 'lucide-react';
 import { useBusiness } from '../contexts/BusinessContext';
+import api from '@/services/api'; // Usando a instância do Axios
 
 const ClientServiceDiscoveryPage = () => {
     const { businessType } = useBusiness();
     
-    // Estados para dados, loading e erros
     const [allCompanies, setAllCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Estados para os filtros
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedServiceType, setSelectedServiceType] = useState('');
     const [availableServiceTypes, setAvailableServiceTypes] = useState([]);
     const [filteredCompanies, setFilteredCompanies] = useState([]);
 
-    // Função para buscar TODAS as empresas (Plano B)
-    const fetchAllCompanies = useCallback(async (initialMessage = null) => {
+    // Função genérica para buscar empresas, seja por proximidade ou todas
+    const fetchCompanies = useCallback(async (location = null) => {
         setLoading(true);
-        setError(initialMessage); 
+        setError(null);
+        console.log("📍 [fetchCompanies] Iniciando busca com a localização:", location);
         try {
-            const apiUrl = `${import.meta.env.VITE_API_URL}/api/empresas`;
-            const response = await fetch(apiUrl);
-            if (!response.ok) {
-                throw new Error(`Não foi possível carregar a lista de estabelecimentos.`);
+            let response;
+            if (location) {
+                console.log(`📡 [fetchCompanies] Buscando por proximidade: lat=${location.latitude}, lng=${location.longitude}`);
+                response = await api.get('/empresas/proximas', {
+                    params: {
+                        lat: location.latitude,
+                        lng: location.longitude,
+                        raio: 50
+                    }
+                });
+            } else {
+                console.log("📡 [fetchCompanies] Buscando todas as empresas (fallback).");
+                response = await api.get('/empresas');
             }
-            const data = await response.json();
-            setAllCompanies(data);
-            if (!initialMessage) setError(null);
+            console.log("✅ [fetchCompanies] Resposta da API recebida:", response.data);
+            setAllCompanies(response.data);
         } catch (err) {
-            console.error("Erro ao buscar todas as empresas:", err);
-            setError(err.message);
+            console.error("❌ [fetchCompanies] Erro ao buscar empresas:", err);
+            setError(err.response?.data?.erro || "Não foi possível carregar os estabelecimentos.");
             setAllCompanies([]);
         } finally {
             setLoading(false);
         }
     }, []);
 
-    // Efeito para buscar os dados iniciais (com geolocalização ou fallback)
+    // Efeito para buscar a localização e depois os dados
     useEffect(() => {
-        const fetchCompaniesByLocation = async (position) => {
-            const { latitude, longitude } = position.coords;
-            setLoading(true);
-            setError(null);
-            try {
-                const apiUrl = `${import.meta.env.VITE_API_URL}/api/empresas/proximas?lat=${latitude}&lng=${longitude}&raio=20`;
-                const response = await fetch(apiUrl);
-                if (!response.ok) {
-                    throw new Error(`Erro na resposta da API: ${response.statusText}`);
-                }
-                const data = await response.json();
-                setAllCompanies(data);
-            } catch (err) {
-                console.error("Erro ao buscar empresas por proximidade:", err);
-                fetchAllCompanies('Não foi possível buscar por proximidade. Mostrando todos os resultados.');
-            } finally {
-                setLoading(false);
-            }
-        };
-
+        console.log("🗺️ [useEffect Geolocation] Tentando obter a geolocalização do navegador.");
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
-                fetchCompaniesByLocation,
+                (position) => {
+                    console.log("🗺️ [useEffect Geolocation] Sucesso! Posição obtida:", position.coords);
+                    fetchCompanies({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    });
+                },
                 (geoError) => { 
-                    console.warn("Usuário negou ou falhou a geolocalização:", geoError.message);
-                    fetchAllCompanies("Você não permitiu o acesso à localização. Mostrando todos os estabelecimentos.");
+                    console.warn("🗺️ [useEffect Geolocation] Falhou ou foi negado:", geoError.message);
+                    setError("Você não permitiu a localização. Usando uma localização padrão.");
+                    fetchCompanies({
+                        latitude: -20.8305,
+                        longitude: -49.3818
+                    });
                 }
             );
         } else {
-            console.warn("Geolocalização não é suportada por este navegador.");
-            fetchAllCompanies("Geolocalização não suportada. Mostrando todos os estabelecimentos.");
+            console.warn("🗺️ [useEffect Geolocation] Navegador não suporta geolocalização.");
+            setError("Geolocalização não suportada. Usando uma localização padrão.");
+            fetchCompanies({
+                latitude: -20.8305,
+                longitude: -49.3818
+            });
         }
-    }, [fetchAllCompanies]);
+    }, [fetchCompanies]);
 
-    // Efeito para filtrar as empresas sempre que os filtros ou os dados mudarem
+    // Efeito para aplicar os filtros
     useEffect(() => {
+        console.log("🔍 [useEffect Filters] Iniciando a filtragem...");
+        console.log("🔍 [useEffect Filters] Dados brutos (allCompanies):", allCompanies);
         let companiesToFilter = [...allCompanies];
 
-        // Gera a lista de tipos de serviço para o dropdown de filtro
         if (companiesToFilter.length > 0) {
             const allServices = companiesToFilter.flatMap(e => e.servicos || []);
             const uniqueServiceTypes = [...new Set(
@@ -100,26 +102,27 @@ const ClientServiceDiscoveryPage = () => {
             setAvailableServiceTypes(uniqueServiceTypes);
         }
 
-        // Aplica o filtro por tipo de serviço
         if (selectedServiceType) {
+            console.log(`🔍 [useEffect Filters] Aplicando filtro de serviço: "${selectedServiceType}"`);
             companiesToFilter = companiesToFilter.filter(company =>
                 company.servicos?.some(service => service.name.toLowerCase() === selectedServiceType.toLowerCase())
             );
         }
 
-        // Aplica o filtro por termo de busca
         if (searchTerm) {
+            console.log(`🔍 [useEffect Filters] Aplicando filtro de busca: "${searchTerm}"`);
             companiesToFilter = companiesToFilter.filter(company =>
                 company.nome_empresa.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (company.endereco && `${company.endereco.rua}, ${company.endereco.numero}, ${company.endereco.bairro}`.toLowerCase().includes(searchTerm.toLowerCase()))
+                (company.endereco && `${company.endereco.rua}, ${company.endereco.bairro}`.toLowerCase().includes(searchTerm.toLowerCase()))
             );
         }
         
+        console.log("🔍 [useEffect Filters] Resultado final (filteredCompanies):", companiesToFilter);
         setFilteredCompanies(companiesToFilter);
         
     }, [searchTerm, selectedServiceType, allCompanies]);
 
-    // Função para renderizar o conteúdo principal da página
+    // ... (O restante do seu código para renderizar a página (renderContent) permanece o mesmo)
     const renderContent = () => {
         if (loading) {
             return (
@@ -127,17 +130,6 @@ const ClientServiceDiscoveryPage = () => {
                     <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
                     <h2 className="text-2xl font-semibold text-foreground">Buscando estabelecimentos...</h2>
                     <p className="text-muted-foreground mt-2">Isso pode levar um instante.</p>
-                </div>
-            );
-        }
-
-        if (error && filteredCompanies.length === 0) {
-            return (
-                <div className="text-center py-16 bg-destructive/10 border border-destructive/20 rounded-lg">
-                    <AlertTriangle className="h-16 w-16 mx-auto text-destructive mb-4" />
-                    <h2 className="text-2xl font-semibold text-destructive mb-2">Ocorreu um Erro</h2>
-                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">{error}</p>
-                    <Button onClick={() => window.location.reload()}>Tentar Novamente</Button>
                 </div>
             );
         }

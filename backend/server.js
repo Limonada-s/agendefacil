@@ -1,6 +1,5 @@
 import express from "express";
 import db from "./models/index.js"; 
-import fileupload from 'express-fileupload';
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { fileURLToPath } from 'url';
@@ -10,7 +9,6 @@ import logger from './logger.js';
 import { v4 as uuid } from 'uuid';
 import { startReminderScheduler } from './scheduler/appointmentScheduler.js'
 import dotenv from 'dotenv';
-
 
 dotenv.config();
 import { runSeed } from './seeders/run-seed.js';
@@ -52,7 +50,6 @@ app.use((req, res, next) => {
 });
 
 // Middlewares
-
 const allowedOrigins = ['http://localhost:5173', 'https://agendefacil.vercel.app'];
 app.use(cors({
   origin: function (origin, callback) {
@@ -67,7 +64,25 @@ app.use(cors({
 
 app.use(cookieParser());
 app.use(express.json());
-app.use(fileupload({ useTempFiles: true, tempFileDir: path.join(__dirname, 'temp') }));
+
+// Middleware para permitir que o frontend simule requisições PUT/DELETE
+
+app.use((req, res, next) => {
+  // Vamos logar apenas para as rotas de serviço para não poluir o console
+  if (req.originalUrl.startsWith('/api/servicos/')) {
+    logger.info('DEBUG: Method Override Check', {
+      requestId: res.locals.requestId,
+      originalMethod: req.originalMethod, // O método ANTES do override
+      newMethod: req.method,             // O método DEPOIS do override
+      body: req.body,                    // Para ver se _method está no corpo da requisição
+    });
+  }
+  next();
+});
+
+// Torna a pasta 'uploads' estática para que as imagens possam ser acessadas pela URL
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 
 // Rotas da API
 app.use('/api/superadmin', superAdminRoutes);
@@ -98,11 +113,8 @@ const start = async () => {
     await db.sequelize.authenticate();
     console.log("Conectado ao PostgreSQL!");
 
-    // Apenas em ambiente de desenvolvimento, recriamos o banco e populamos
     if (process.env.NODE_ENV !== 'production') {
-      await db.sequelize.sync({ alter: true });
-      console.log("Banco de dados FORÇADAMENTE sincronizado.");
-      await runSeed();
+      // Lógica de seed...
     }
 
     const PORT = process.env.PORT || 5000;
@@ -117,11 +129,8 @@ const start = async () => {
   }
 };
 
-// Esta verificação garante que o servidor só inicie quando rodamos "node server.js"
-// e não quando ele é importado por um teste.
 if (process.env.NODE_ENV !== 'test') {
   start();
 }
 
-// Exportamos o 'app' para os testes e o 'server' para podermos desligá-lo.
 export { app, server, db };

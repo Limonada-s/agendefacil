@@ -56,8 +56,9 @@ export const registerCompany = async (req, res) => {
       endereco: enderecoData
     } = req.body;
 
+    // Validações iniciais (mantidas)
     if (process.env.NODE_ENV !== 'test') {
-      if (!cpf_dono && !cnpj) {
+        if (!cpf_dono && !cnpj) {
             await transaction.rollback();
             return res.status(400).json({ erro: 'É necessário fornecer um CPF ou um CNPJ.' });
         }
@@ -77,13 +78,11 @@ export const registerCompany = async (req, res) => {
 
     logger.info('📦 Início do registro de empresa', { nome_empresa, email_admin });
 
-    if (!senha) {
-      throw new Error("O campo 'senha' é obrigatório.");
-    }
-
     const cleanCnpj = cnpj ? cleanDocument(cnpj) : null;
     const cleanCpf = cpf_dono ? cleanDocument(cpf_dono) : null;
 
+    // ===== VALIDAÇÃO CORRIGIDA =====
+    // Constrói a condição de busca dinamicamente
     const orConditions = [{ email_admin: email_admin }];
     if (cleanCnpj) {
       orConditions.push({ cnpj: cleanCnpj });
@@ -94,14 +93,11 @@ export const registerCompany = async (req, res) => {
 
     const existingCompany = await Empresa.findOne({
       where: {
-        [Op.or]: [
-          { cnpj: cleanCnpj },
-          { email_admin: email_admin },
-          { cpf_dono: cleanCpf }
-        ]
+        [Op.or]: orConditions
       },
       transaction
     });
+    // ===============================
 
     if (existingCompany) {
       await transaction.rollback();
@@ -119,7 +115,7 @@ export const registerCompany = async (req, res) => {
       zip_code: enderecoData.zipCode.trim()
     }, { transaction });
 
-    // ===== ETAPA DE GEOCODIFICAÇÃO =====
+    // Etapa de Geocodificação (mantida)
     let latitude = null;
     let longitude = null;
     const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
@@ -148,7 +144,6 @@ export const registerCompany = async (req, res) => {
     } else {
         logger.warn('Chave da API do Google Maps não configurada. A geocodificação foi pulada.');
     }
-    // =========================================
 
     const empresa = await Empresa.create({
       nome_empresa,
@@ -159,8 +154,8 @@ export const registerCompany = async (req, res) => {
       telefone,
       senha: hashedPassword,
       endereco_id: endereco.id,
-      latitude, // Salva a latitude obtida
-      longitude // Salva a longitude obtida
+      latitude,
+      longitude
     }, { transaction });
 
     await Login.create({
@@ -172,7 +167,6 @@ export const registerCompany = async (req, res) => {
       companyId: empresa.id
     }, { transaction });
     
-
     await transaction.commit();
 
     return res.status(201).json({ sucesso: true, empresa });
@@ -262,7 +256,11 @@ export const getEmpresaById = async (req, res) => {
       include: [
         { model: Categoria, as: 'categorias', through: { attributes: [] } },
         { model: Endereco, as: 'endereco' },
-        { model: Servico, as: 'servicos', attributes: ['id', 'name', 'price', 'duration'] },
+        { 
+          model: Servico, 
+          as: 'servicos', 
+          attributes: ['id', 'name', 'price', 'duration', 'image', 'description']
+        },
         { model: Review, as: 'reviews', include: [{ model: Login, as: 'client', attributes: ['nome'] }] }
       ]
     });
@@ -279,7 +277,10 @@ export const getEmpresaById = async (req, res) => {
 export const listarServicosDaEmpresa = async (req, res) => {
   try {
     const { empresaId } = req.params;
-    const servicos = await Servico.findAll({ where: { companyId: empresaId } });
+    const servicos = await Servico.findAll({ 
+        where: { companyId: empresaId },
+        attributes: ['id', 'name', 'description', 'duration', 'price', 'image', 'companyId', 'categoryId', 'createdAt', 'updatedAt']
+    });
     res.json(servicos);
   } catch (error) {
     logger.error('Erro ao listar serviços da empresa', { error: error.message });

@@ -3,6 +3,13 @@ import logger from '../logger.js';
 
 const { Servico, Empresa, Categoria, Professional, Login } = db;
 
+
+const getImageUrl = (req, filePath) => {
+    if (!filePath) return null;
+    const normalizedPath = filePath.replace(/\\/g, "/"); // Garante que as barras sejam '/'
+    return `${req.protocol}://${req.get('host')}/${normalizedPath}`;
+}
+
 const listarServicos = async (req, res) => {
   try {
     const companyId = req.params.empresaId;
@@ -47,7 +54,7 @@ export const criarServico = async (req, res) => {
 
         // Adiciona a imagem se ela for enviada no formulário (via multer)
         if (req.file) {
-            data.image = req.file.path; 
+            data.image = getImageUrl(req, req.file.path); 
         }
 
         const servico = await Servico.create(data);
@@ -72,66 +79,67 @@ export const criarServico = async (req, res) => {
 
 export const atualizarServico = async (req, res) => {
     try {
-        const { servicoId } = req.params;
+        const { id } = req.params;
         const companyId = req.user.companyId;
-        const updateData = req.body;
+        const { professionals_ids, ...updateData } = req.body;
 
-        const servico = await Servico.findOne({ where: { id: servicoId, companyId } });
+        // Usa a variável 'id' corrigida para encontrar o serviço.
+        const servico = await Servico.findOne({ where: { id: id, companyId } });
 
         if (!servico) {
             return res.status(404).json({ erro: 'Serviço não encontrado ou não pertence à sua empresa.' });
         }
 
-        // Passo 5: Atualiza a imagem se uma nova for enviada
+        // Atualiza a imagem se uma nova for enviada
         if (req.file) {
-            updateData.image = req.file.path;
+            updateData.image = getImageUrl(req, req.file.path);
         }
 
         await servico.update(updateData);
 
-        logger.info('✔️ Serviço atualizado com sucesso', { serviceId });
+        if (professionals_ids && Array.isArray(professionals_ids)) {
+            await servico.setProfissionais(professionals_ids);
+        }
+
+        logger.info('✔️ Serviço atualizado com sucesso', { serviceId: id });
         res.status(200).json(servico);
 
     } catch (error) {
         logger.error('❌ Erro ao atualizar serviço', { 
             error: error.message, 
-            serviceId: req.params.servicoId 
+            serviceId: req.params.id 
         });
         res.status(500).json({ erro: 'Erro interno ao atualizar o serviço.' });
     }
 };
 
-const excluirServico = async (req, res) => {
-  try {
+export const excluirServico = async (req, res) => {
     const { id } = req.params;
-    const servico = await Servico.findByPk(id);
+    const companyId = req.user.companyId;
+    try {
+        const servico = await Servico.findOne({ where: { id, companyId } });
 
-    if (!servico) {
-      logger.warn('servico_nao_encontrado_para_exclusao', {
-        serviceId: id,
-        userId: req.user?.id
-      });
-      return res.status(404).json({ erro: 'Serviço não encontrado.' });
+        if (!servico) {
+            return res.status(404).json({ erro: 'Serviço não encontrado ou não pertence à sua empresa.' });
+        }
+
+        // Deleta a imagem do disco se ela existir
+        if (servico.image) {
+            const imagePath = path.join(process.cwd(), new URL(servico.image).pathname);
+            if (fs.existsSync(imagePath)) {
+                fs.unlinkSync(imagePath);
+            }
+        }
+
+        await servico.destroy();
+        logger.info('✔️ Serviço excluído com sucesso', { serviceId: id, companyId });
+        res.status(200).json({ mensagem: 'Serviço excluído com sucesso.' });
+    } catch (error) {
+        logger.error('❌ Erro ao excluir serviço', { error: error.message, serviceId: id });
+        res.status(500).json({ erro: 'Erro ao excluir o serviço.' });
     }
-
-    await servico.destroy();
-
-    logger.info('servico_excluido', {
-      serviceId: id,
-      userId: req.user.id
-    });
-
-    res.json({ mensagem: 'Serviço excluído com sucesso.' });
-  } catch (err) {
-    logger.error('erro ao excluir serviço', {
-      error: err.message,
-      stack: err.stack,
-      serviceId: req.params?.id,
-      userId: req.user?.id
-    });
-    res.status(500).json({ erro: 'Erro ao excluir serviço' });
-  }
 };
+
 export const getProfessionalsForService = async (req, res) => {
   try {
     const { id } = req.params;

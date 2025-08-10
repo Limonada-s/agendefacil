@@ -1,20 +1,25 @@
 import express from 'express';
-import servicoController from '../controllers/servicoController.js';
+import {
+    criarServico,
+    atualizarServico,
+    excluirServico,
+    getProfessionalsForService
+} from '../controllers/servicoController.js'; 
 import { autenticarEmpresa } from '../middlewares/authMiddleware.js';
+import upload from '../middlewares/upload.js';
 
 const router = express.Router();
 
-router.post('/', autenticarEmpresa, servicoController.criarServico);
+// Rota para CRIAR um serviço (continua POST)
+router.post('/', autenticarEmpresa, upload.single('image'), criarServico);
 
-// Rota para ATUALIZAR um serviço existente
-// Caminho final: PUT /api/servicos/:id
-router.put('/:id', autenticarEmpresa, servicoController.atualizarServico);
+// ✅ CORREÇÃO: A rota de atualização agora aceita POST, que corresponde ao que o frontend envia.
+router.post('/:id', autenticarEmpresa, upload.single('image'), atualizarServico);
 
-// Rota para EXCLUIR um serviço existente
-// Caminho final: DELETE /api/servicos/:id
-router.delete('/:id', autenticarEmpresa, servicoController.excluirServico);
+// Rota para EXCLUIR um serviço
+router.delete('/:id', autenticarEmpresa, excluirServico);
 
-router.get('/:id/profissionais', servicoController.getProfessionalsForService);
+// Rota para buscar profissionais de um serviço
+router.get('/:id/profissionais', getProfessionalsForService);
 
 export default router;
-
