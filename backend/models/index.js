@@ -1,6 +1,3 @@
-// Arquivo: backend/src/models/index.js
-// VERSÃO LIMPA E FINAL
-
 import { Sequelize } from 'sequelize';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
@@ -23,6 +20,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const env = process.env.NODE_ENV || 'development';
+// O caminho aqui foi corrigido para não ter 'src'
 const config = require(join(__dirname, '..', 'config', 'config.cjs'))[env];
 
 const db = {};

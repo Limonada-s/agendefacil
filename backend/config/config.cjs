@@ -1,3 +1,6 @@
+// Arquivo: backend/config/config.cjs
+// VERSÃO DEFINITIVA QUE FORÇA O HOST A USAR O SOCKET PATH
+
 require('dotenv').config();
 
 module.exports = {
@@ -25,14 +28,11 @@ module.exports = {
     password: process.env.DB_PASS,
     database: process.env.DB_NAME,
     dialect: 'postgres',
-    
-    // --- A TRAPAÇA FINAL ---
-    // Definimos 'host' como undefined para tentar impedir que o Sequelize
-    // adicione 'localhost' como padrão.
-    host: undefined,
 
+    host: process.env.DB_HOST, 
+
+    // Mantemos o dialectOptions por segurança, mas o 'host' agora é a chave.
     dialectOptions: {
-      // A conexão DEVE usar este socket.
       socketPath: process.env.DB_HOST 
     }
   }
