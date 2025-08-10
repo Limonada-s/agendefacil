@@ -13,8 +13,8 @@ import defineExpense from './Expense.js';
 import defineReview from './Review.js';
 import defineAppLog from './AppLog.js';
 
-// A inicialização do Sequelize agora usa o operador 'spread' (...) para passar
-// todas as opções corretas (host para dev, dialectOptions para prod).
+console.log('[models/index.js] Configuração recebida para criar Sequelize:', dbConfig);
+
 const sequelize = new Sequelize(
   dbConfig.database,
   dbConfig.username,
