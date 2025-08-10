@@ -1,4 +1,3 @@
-// config/config.cjs
 require('dotenv').config();
 
 module.exports = {
@@ -6,7 +5,19 @@ module.exports = {
     username: process.env.DB_USER,
     password: process.env.DB_PASS,
     database: process.env.DB_NAME,
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST,
+    dialect: 'postgres'
+  },
+  test: {
+    // ... sua configuração de teste
+  },
+  production: {
+    username: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    database: process.env.DB_NAME,
     dialect: 'postgres',
+    dialectOptions: {
+      socketPath: process.env.DB_HOST // <-- AQUI ESTÁ A CORREÇÃO
+    }
   }
 };
