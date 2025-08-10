@@ -1,5 +1,5 @@
 // Arquivo: backend/src/models/index.js
-// VERSÃO DE DEPURAÇÃO MÁXIMA
+// VERSÃO LIMPA E FINAL
 
 import { Sequelize } from 'sequelize';
 import { createRequire } from 'module';
@@ -18,34 +18,16 @@ import defineExpense from './Expense.js';
 import defineReview from './Review.js';
 import defineAppLog from './AppLog.js';
 
-console.log("--- [LOG] 1. Iniciando models/index.js ---");
-
 const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const env = process.env.NODE_ENV || 'development';
-console.log(`--- [LOG] 2. Ambiente detectado: "${env}" ---`);
-
-const configPath = join(__dirname, '..', 'config', 'config.cjs');
-console.log(`--- [LOG] 3. Carregando config de: "${configPath}" ---`);
-
-const config = require(configPath)[env];
-console.log('--- [LOG] 4. Configuração BRUTA carregada:', JSON.stringify(config, null, 2));
-
-if (env === 'production') {
-  delete config.host;
-  console.log('--- [LOG] 5. Ambiente é PRODUÇÃO. Propriedade "host" removida da config.');
-}
+const config = require(join(__dirname, '..', 'config', 'config.cjs'))[env];
 
 const db = {};
 
-console.log('--- [LOG] 6. Inicializando Sequelize com a seguinte configuração FINAL:', JSON.stringify(config, null, 2));
 const sequelize = new Sequelize(config);
-
-console.log('--- [LOG] 7. Objeto Sequelize CRIADO. Inspecionando suas opções INTERNAS:');
-console.log(JSON.stringify(sequelize.options, null, 2));
-
 
 // Carrega todos os modelos
 db.Login = defineLogin(sequelize);
@@ -69,5 +51,4 @@ Object.values(db).forEach((model) => {
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
 
-console.log("--- [LOG] 8. Exportando 'db' de models/index.js ---");
 export default db;
