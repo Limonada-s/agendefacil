@@ -1,3 +1,4 @@
+
 import { Sequelize } from 'sequelize';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
@@ -15,42 +16,19 @@ import defineExpense from './Expense.js';
 import defineReview from './Review.js';
 import defineAppLog from './AppLog.js';
 
-// --- INÍCIO DA DEPURAÇÃO ---
-console.log("--- [DEBUG] Iniciando models/index.js ---");
-
 const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// 1. Verificando a variável de ambiente NODE_ENV
 const env = process.env.NODE_ENV || 'development';
-console.log(`--- [DEBUG] Variável NODE_ENV detectada: "${env}" ---`);
-
-// 2. Construindo o caminho para o arquivo de configuração
-const configPath = join(__dirname, '..', 'config', 'config.cjs');
-console.log(`--- [DEBUG] Tentando carregar configuração de: "${configPath}" ---`);
-
-// 3. Carregando a configuração específica do ambiente
-const allConfigs = require(configPath);
-const config = allConfigs[env];
-
-if (!config) {
-    console.error(`--- [ERRO FATAL] Nenhuma configuração encontrada para o ambiente "${env}" no arquivo config.cjs!`);
-    process.exit(1); // Encerra a aplicação se a config não for encontrada
-}
-
-console.log('--- [DEBUG] Configuração carregada para o ambiente:', JSON.stringify(config, null, 2));
-// --- FIM DA DEPURAÇÃO ---
+const config = require(join(__dirname, '..', 'config', 'config.cjs'))[env];
 
 const db = {};
 
-// Inicializa a conexão do Sequelize
-let sequelize;
-if (config.use_env_variable) {
-  sequelize = new Sequelize(process.env[config.use_env_variable], config);
-} else {
-  sequelize = new Sequelize(config.database, config.username, config.password, config);
-}
+// --- ALTERAÇÃO CRÍTICA ABAIXO ---
+// Em vez de passar múltiplos argumentos, passamos um único objeto de configuração.
+// Isso é mais robusto e garante que todas as opções, incluindo o socketPath, sejam lidas.
+const sequelize = new Sequelize(config);
 
 // Carrega todos os modelos
 db.Login = defineLogin(sequelize);
