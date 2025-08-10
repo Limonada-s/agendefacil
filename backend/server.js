@@ -1,3 +1,7 @@
+// Em: src/server.js
+
+console.log('>>>> AMBIENTE DETETADO:', process.env.NODE_ENV); // <-- LINHA DE DEPURAÇÃO ADICIONADA
+
 import express from "express";
 import db from "./models/index.js"; 
 import cors from "cors";
@@ -66,15 +70,13 @@ app.use(cookieParser());
 app.use(express.json());
 
 // Middleware para permitir que o frontend simule requisições PUT/DELETE
-
 app.use((req, res, next) => {
-  // Vamos logar apenas para as rotas de serviço para não poluir o console
   if (req.originalUrl.startsWith('/api/servicos/')) {
     logger.info('DEBUG: Method Override Check', {
       requestId: res.locals.requestId,
-      originalMethod: req.originalMethod, // O método ANTES do override
-      newMethod: req.method,             // O método DEPOIS do override
-      body: req.body,                    // Para ver se _method está no corpo da requisição
+      originalMethod: req.originalMethod,
+      newMethod: req.method,
+      body: req.body,
     });
   }
   next();
