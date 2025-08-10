@@ -1,3 +1,5 @@
+// Arquivo: backend/src/models/index.js
+// VERSÃO FINAL COM CORREÇÃO NA INICIALIZAÇÃO DO SEQUELIZE
 
 import { Sequelize } from 'sequelize';
 import { createRequire } from 'module';
@@ -23,9 +25,15 @@ const __dirname = dirname(__filename);
 const env = process.env.NODE_ENV || 'development';
 const config = require(join(__dirname, '..', 'config', 'config.cjs'))[env];
 
+// --- ABORDAGEM FINAL: FORÇAR A CONFIGURAÇÃO ---
+// Se estivermos em produção, vamos garantir que não há como ele tentar usar o 'host'.
+// Removemos a propriedade 'host' do objeto de configuração antes de usá-lo.
+if (env === 'production') {
+  delete config.host; // Força o Sequelize a usar o socketPath
+}
+
 const db = {};
 
-// --- ALTERAÇÃO CRÍTICA ABAIXO ---
 // Em vez de passar múltiplos argumentos, passamos um único objeto de configuração.
 // Isso é mais robusto e garante que todas as opções, incluindo o socketPath, sejam lidas.
 const sequelize = new Sequelize(config);
