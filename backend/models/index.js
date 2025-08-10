@@ -12,8 +12,17 @@ import defineProfessional from './Professional.js';
 import defineExpense from './Expense.js'
 import defineReview from './Review.js';
 import defineAppLog from './AppLog.js';
+import logger from '../logger.js';
 
-const sequelize = new Sequelize(dbConfig);
+const sequelize = new Sequelize(
+  dbConfig.database,
+  dbConfig.username,
+  dbConfig.password,
+  {
+    ...dbConfig, 
+    logging: (msg) => logger.debug(msg),
+  }
+);
 const db = {};
 
 db.Login = defineLogin(sequelize);
