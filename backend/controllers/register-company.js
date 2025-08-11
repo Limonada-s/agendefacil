@@ -56,7 +56,12 @@ export const registerCompany = async (req, res) => {
       endereco: enderecoData
     } = req.body;
 
-    // Validações iniciais (mantidas)
+    // --- LÓGICA DE UPLOAD ATUALIZADA ---
+    // Em produção, a URL virá do Google Cloud Storage. Em desenvolvimento, do disco local.
+    // O 'path' é preenchido pelo multer-google-storage com a URL pública.
+    const logoUrl = req.file ? req.file.path : null;
+
+    // Validações iniciais (mantidas do seu código)
     if (process.env.NODE_ENV !== 'test') {
         if (!cpf_dono && !cnpj) {
             await transaction.rollback();
@@ -81,8 +86,7 @@ export const registerCompany = async (req, res) => {
     const cleanCnpj = cnpj ? cleanDocument(cnpj) : null;
     const cleanCpf = cpf_dono ? cleanDocument(cpf_dono) : null;
 
-    // ===== VALIDAÇÃO CORRIGIDA =====
-    // Constrói a condição de busca dinamicamente
+    // Validação de duplicidade (mantida do seu código)
     const orConditions = [{ email_admin: email_admin }];
     if (cleanCnpj) {
       orConditions.push({ cnpj: cleanCnpj });
@@ -97,7 +101,6 @@ export const registerCompany = async (req, res) => {
       },
       transaction
     });
-    // ===============================
 
     if (existingCompany) {
       await transaction.rollback();
@@ -115,7 +118,7 @@ export const registerCompany = async (req, res) => {
       zip_code: enderecoData.zipCode.trim()
     }, { transaction });
 
-    // Etapa de Geocodificação (mantida)
+    // Etapa de Geocodificação (mantida do seu código)
     let latitude = null;
     let longitude = null;
     const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
@@ -145,6 +148,7 @@ export const registerCompany = async (req, res) => {
         logger.warn('Chave da API do Google Maps não configurada. A geocodificação foi pulada.');
     }
 
+    // Criação da empresa no banco de dados, agora com o campo 'logo'
     const empresa = await Empresa.create({
       nome_empresa,
       cnpj: cleanCnpj,
@@ -155,9 +159,11 @@ export const registerCompany = async (req, res) => {
       senha: hashedPassword,
       endereco_id: endereco.id,
       latitude,
-      longitude
+      longitude,
+      logo: logoUrl // <-- CAMPO ADICIONADO
     }, { transaction });
 
+    // Criação do login de admin (mantida do seu código)
     await Login.create({
       nome: nome_dono,
       email: email_admin,
@@ -172,7 +178,7 @@ export const registerCompany = async (req, res) => {
     return res.status(201).json({ sucesso: true, empresa });
   } catch (error) {
     await transaction.rollback();
-    logger.error('❌ Erro ao registrar empresa', { error: error.message });
+    logger.error('❌ Erro ao registrar empresa', { error: error.message, stack: error.stack });
     
     let userMessage = 'Erro ao registrar empresa';
     if (error.name === 'SequelizeUniqueConstraintError') {

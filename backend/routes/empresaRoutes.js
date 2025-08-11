@@ -1,33 +1,39 @@
-// Arquivo: src/routes/empresaRoutes.js
+// Arquivo: backend/routes/empresaRoutes.js
+// VERSÃO FINAL COM NOMES E CAMINHOS CORRIGIDOS
 
 import express from 'express';
+import multer from 'multer';
+import uploadConfig from '../middlewares/upload.js'; // Caminho corrigido
 import {
-  getEmpresaById,
-  listarEmpresasProximas,
-  registerCompany,
-  listarServicosDaEmpresa,
-  updateCompanySettings,
-  cancelCompanyAccount,
-  listarTodasEmpresasPublicas // Importa a nova função
-} from '../controllers/register-company.js'; // <<<--- ESTA LINHA ESTÁ CORRIGIDA
-
-import { autenticarEmpresa } from '../middlewares/authMiddleware.js';
+  registerCompany,
+  listarTodasEmpresasPublicas,
+  listarEmpresasProximas,
+  getEmpresaById,
+  listarServicosDaEmpresa,
+  updateCompanySettings,
+  cancelCompanyAccount
+} from '../controllers/register-company.js'; // NOME DO ARQUIVO CORRIGIDO
+import { autenticarEmpresa } from '../middlewares/authMiddleware.js'; // CAMINHO CORRIGIDO
 
 const router = express.Router();
+const upload = multer(uploadConfig);
 
-// Rota pública para listar TODAS as empresas (fallback)
-// Deve vir ANTES de /:id para evitar conflitos.
+// Rota pública para listar TODAS as empresas
 router.get('/', listarTodasEmpresasPublicas);
 
 // Rota para listar empresas por geolocalização
 router.get('/proximas', listarEmpresasProximas);
 
-// Rota para buscar uma empresa específica por ID
+// Rota de registro de empresa com upload de logo
+router.post('/register-company', upload.single('logo'), registerCompany);
+
+// Rota pública para obter detalhes de uma empresa por ID
 router.get('/:id', getEmpresaById);
 
-// Outras rotas
+// Rota pública para listar serviços de uma empresa
 router.get('/:empresaId/servicos', listarServicosDaEmpresa);
-router.post('/register-company', registerCompany);
+
+// Rotas protegidas
 router.put('/settings', autenticarEmpresa, updateCompanySettings);
 router.delete('/cancel-account', autenticarEmpresa, cancelCompanyAccount);
 

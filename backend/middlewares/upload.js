@@ -1,49 +1,69 @@
+// Arquivo: backend/middlewares/upload.js
+// VERSÃO FINAL COM LÓGICA DE AMBIENTE E EXPORTAÇÃO CORRETA
+
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
+import crypto from 'crypto';
+import { Storage } from '@google-cloud/storage';
+import MGS from 'multer-google-storage';
 
-// Define o diretório onde as imagens serão salvas
-const uploadDir = 'uploads/';
+const MulterGoogleStorage = MGS.default || MGS;
 
-// Garante que o diretório de uploads exista. Se não, ele é criado.
-if (!fs.existsSync(uploadDir)){
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
+const GCS_BUCKET_NAME = process.env.GCS_BUCKET_NAME; 
 
-/**
- * @description Configuração de armazenamento do Multer.
- * Define o destino e o nome do arquivo.
- */
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir); // Salva os arquivos na pasta 'uploads/'
-  },
-  filename: (req, file, cb) => {
-    // Cria um nome de arquivo único para evitar conflitos
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const extension = path.extname(file.originalname);
-    cb(null, file.fieldname + '-' + uniqueSuffix + extension);
-  }
-});
+const __dirname = path.dirname(new URL(import.meta.url).pathname.substring(1));
 
-/**
- * @description Filtro para garantir que apenas imagens sejam aceitas.
- */
-const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith('image/')) {
-    cb(null, true); // Aceita o arquivo
-  } else {
-    cb(new Error('Formato de arquivo não suportado! Apenas imagens são permitidas.'), false); // Rejeita o arquivo
-  }
+const storageTypes = {
+  // Configuração para salvar arquivos localmente (desenvolvimento/teste)
+  local: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, path.resolve(__dirname, '..', 'uploads'));
+    },
+    filename: (req, file, cb) => {
+      crypto.randomBytes(16, (err, hash) => {
+        if (err) cb(err);
+        const fileName = `${hash.toString('hex')}-${file.originalname}`;
+        cb(null, fileName);
+      });
+    },
+  }),
 };
 
-// Cria a instância do Multer com as configurações
-const upload = multer({ 
-  storage: storage, 
-  fileFilter: fileFilter, 
-  limits: { 
-    fileSize: 1024 * 1024 * 5 // Limite de 5MB por arquivo
-  } 
-});
+if (process.env.NODE_ENV === 'production' && GCS_BUCKET_NAME) {
+  storageTypes.gcs = new MulterGoogleStorage({
+    bucket: GCS_BUCKET_NAME,
+    filename: (req, file, cb) => {
+      crypto.randomBytes(16, (err, hash) => {
+        if (err) cb(err);
+        const fileName = `${hash.toString('hex')}-${file.originalname}`;
+        cb(null, fileName);
+      });
+    },
+  });
+}
 
-export default upload;
+// Cria o objeto de configuração
+const uploadConfig = {
+  dest: path.resolve(__dirname, '..', 'uploads'),
+  storage: storageTypes.gcs || storageTypes.local,
+  limits: {
+    fileSize: 2 * 1024 * 1024, // Limite de 2MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = [
+      'image/jpeg',
+      'image/pjpeg',
+      'image/png',
+      'image/gif',
+    ];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type.'));
+    }
+  },
+};
+
+// --- CORREÇÃO FINAL ---
+// Exporta a instância do multer já configurada, em vez do objeto de configuração.
+export default multer(uploadConfig);
